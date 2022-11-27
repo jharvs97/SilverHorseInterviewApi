@@ -36,7 +36,6 @@ namespace SilverHorseInterviewApi
 
             if (string.IsNullOrEmpty(endpointPath))
             {
-                Type type = typeof(T);
                 resourceCollectionPath = Helpers.GetModelApiName<T>();
             }
             else
