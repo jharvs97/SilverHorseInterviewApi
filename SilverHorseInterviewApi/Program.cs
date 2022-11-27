@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using SilverHorseInterviewApi.Aggregates;
 using SilverHorseInterviewApi.Models;
 using System.IO;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Claims;
+using Microsoft.OpenApi.Models;
 
 namespace SilverHorseInterviewApi
 {
@@ -66,7 +69,7 @@ namespace SilverHorseInterviewApi
 
         static void AddAggregateEndpoint(WebApplication app, string endpointPrefix = "api/")
         {
-            app.MapGet(endpointPrefix + "collection", async (HttpContext context) =>
+            app.MapGet("/collection", async (HttpContext context) =>
             {
                 Collection collection = new Collection();
                 collection.Posts  = (await GetCollection<Post>(BuildMockDataUri(GetModelApiName<Post>()))).ToArray();
@@ -81,12 +84,40 @@ namespace SilverHorseInterviewApi
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // Add services to the container.
             builder.Services.AddAuthorization();
-
-            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+            
             builder.Services.AddEndpointsApiExplorer();
-            builder.Services.AddSwaggerGen();
+            builder.Services.AddSwaggerGen(options =>
+            {
+                // For testing with swagger, add Bearer token auth scheme.
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Type = SecuritySchemeType.ApiKey,
+                    Description = "Standard Authorization header using the Bearer scheme. Example: \"Bearer {token}\"",
+                    Name = "Authorization",
+                    In = ParameterLocation.Header,
+                    Scheme = "Bearer",
+                });
+
+                options.AddSecurityRequirement(new OpenApiSecurityRequirement
+                {
+                    {
+                        new OpenApiSecurityScheme
+                        {
+                            Reference = new OpenApiReference
+                            {
+                                Type = ReferenceType.SecurityScheme,
+                                Id = "Bearer"
+                            },
+                            Scheme = "oauth2",
+                            Name = "Bearer",
+                            In = ParameterLocation.Header,
+
+                        },
+                        new List<string>()
+                    }
+                });
+            });
 
             var app = builder.Build();
 
@@ -99,6 +130,17 @@ namespace SilverHorseInterviewApi
 
             app.UseHttpsRedirection();
             app.UseAuthorization();
+
+            // Custom middleware to check bearer token
+            app.Use(async (context, next) =>
+            {
+                if (context.Request.Headers.Authorization != "af24353tdsfw")
+                {
+                    throw new Exception("User not authorized");
+                }
+
+                await next(context);
+            });
 
             AddResourceEndpoint<Post>(app);
             AddResourceEndpoint<User>(app);
