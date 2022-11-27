@@ -27,10 +27,15 @@ namespace SilverHorseInterviewApi.Store
             return;
         }
 
+        async Task IStore.Write<T>(int id, T model)
+        {
+            return;
+        }
+
         private async Task<IEnumerable<T>> GetCollection<T>(string path)
            where T : IModel
         {
-            var json = await GetCollectionJson(path);
+            var json = await GetJsonCollection(path);
 
             // Return a deserialized collection or an empty collection
             return JsonSerializer.Deserialize<IEnumerable<T>>(json) ?? new T[] { };
@@ -41,11 +46,10 @@ namespace SilverHorseInterviewApi.Store
         {
             var json = await GetJson(path, id);
 
-            // Return a deserialized collection or an empty collection
             return JsonSerializer.Deserialize<T>(json);
         }
 
-        private async Task<string> GetCollectionJson(string path)
+        private async Task<string> GetJsonCollection(string path)
         {
             using var client = new HttpClient();
 

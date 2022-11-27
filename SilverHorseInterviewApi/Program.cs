@@ -1,12 +1,8 @@
-using Microsoft.AspNetCore.Authorization;
 using SilverHorseInterviewApi.Aggregates;
 using SilverHorseInterviewApi.Models;
-using System.IO;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Security.Claims;
-using Microsoft.OpenApi.Models;
 using SilverHorseInterviewApi.Store;
+using Microsoft.OpenApi.Models;
+using System.Buffers;
 
 namespace SilverHorseInterviewApi
 {
@@ -17,7 +13,8 @@ namespace SilverHorseInterviewApi
             var builder = WebApplication.CreateBuilder(args);
 
             builder.Services.AddAuthorization();
-            
+            builder.Services.AddAuthentication();
+
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options =>
             {
@@ -41,8 +38,8 @@ namespace SilverHorseInterviewApi
                                 Type = ReferenceType.SecurityScheme,
                                 Id = "Bearer"
                             },
-                            Scheme = "oauth2",
-                            Name = "Bearer",
+                            Scheme = "Bearer",
+                            Name = "Authorization",
                             In = ParameterLocation.Header,
 
                         },
@@ -62,24 +59,28 @@ namespace SilverHorseInterviewApi
 
             app.UseHttpsRedirection();
             app.UseAuthorization();
-
+            app.UseAuthentication();
+            
             // Custom middleware to check bearer token
             app.Use(async (context, next) =>
             {
                 if (context.Request.Headers.Authorization != "af24353tdsfw")
                 {
-                    throw new Exception("User not authorized");
+                    context.Response.StatusCode = 501;
+                    await context.Response.WriteAsync("User not authenticated");
                 }
-
-                await next(context);
+                else
+                {
+                    await next(context);
+                }
             });
 
             var endpointBuilder = new ResourceEndpointBuilder(app, new MockStore());
-            endpointBuilder.Add<Post>();
-            endpointBuilder.Add<User>();
-            endpointBuilder.Add<Album>();
+            endpointBuilder.Add<Post>("api/posts");
+            endpointBuilder.Add<User>("api/users");
+            endpointBuilder.Add<Album>("api/albums");
 
-            endpointBuilder.CreateAggregate<Collection>(async (IStore store) =>
+            endpointBuilder.CreateAggregate<Collection>("/collection", async (IStore store) =>
             {
                 var collection = new Collection();
                 collection.Posts  = ChooseNRandom(await store.ReadCollection<Post>(), 30).ToArray();

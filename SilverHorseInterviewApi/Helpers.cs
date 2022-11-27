@@ -17,10 +17,5 @@ namespace SilverHorseInterviewApi
             }
             return resourceName;
         }
-
-        public static string ModelToApiPath<T>(string apiPrefix) where T : IModel
-        {
-            return apiPrefix + GetModelApiName<T>();
-        }
     }
 }

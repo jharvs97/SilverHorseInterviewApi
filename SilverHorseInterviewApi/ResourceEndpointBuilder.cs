@@ -1,30 +1,43 @@
 ﻿using SilverHorseInterviewApi.Aggregates;
 using SilverHorseInterviewApi.Models;
 using SilverHorseInterviewApi.Store;
-using System.Runtime.CompilerServices;
 
 namespace SilverHorseInterviewApi
 {
+    /// <summary>
+    /// Abstraction over adding CRUD operations on a Model
+    /// </summary>
     internal class ResourceEndpointBuilder
     {
-
         private readonly WebApplication _app;
         private readonly IStore _store;
-        private readonly string _endpointPrefix;
 
+        /// <summary>
+        /// Allow the user to create custom aggregates by giving them a reference to the IStore
+        /// </summary>
+        /// <param name="store"></param>
+        /// <returns></returns>
         public delegate Task<IAggregate> AggregateBuilderDelegate(IStore store);
 
-        public ResourceEndpointBuilder(WebApplication app, IStore store, string endpointPrefix = "app/") 
+        public ResourceEndpointBuilder(WebApplication app, IStore store) 
         {
             _app = app;
             _store = store;
-            _endpointPrefix = endpointPrefix;
         }
 
-        public void Add<T>() where T : IModel
+        public void Add<T>(string? endpointPath = null) where T : IModel
         {
-            Type type = typeof(T);
-            string resourceCollectionPath = Helpers.ModelToApiPath<T>(_endpointPrefix);
+            string resourceCollectionPath;
+
+            if (string.IsNullOrEmpty(endpointPath))
+            {
+                Type type = typeof(T);
+                resourceCollectionPath = Helpers.GetModelApiName<T>();
+            }
+            else
+            {
+                resourceCollectionPath = endpointPath;
+            }
 
             _app.MapGet(resourceCollectionPath, async (HttpContext context) =>
             {
@@ -38,12 +51,22 @@ namespace SilverHorseInterviewApi
             })
             .Produces(200, typeof(T), "application/json");
 
-            //TODO: Create and Update
+            // Create/Update are no-op as I dont have a _real_ db store.
+            _app.MapPost(resourceCollectionPath + "/{id}", async (int id, T data, HttpContext context) =>
+            {
+                await _store.Write(data);
+            });
+
+            _app.MapPut(resourceCollectionPath + "/{id}", async (int id, T data, HttpContext context) =>
+            {
+                await _store.Write(data);
+            });
+
         }
 
-        public void CreateAggregate<T>(AggregateBuilderDelegate del) where T : IAggregate
+        public void CreateAggregate<T>(string endpointPath, AggregateBuilderDelegate del) where T : IAggregate
         {
-            _app.MapGet("/" + typeof(T).Name.ToLower(), async (HttpContext context) =>
+            _app.MapGet(endpointPath, async (HttpContext context) =>
             {
                 return (T) await del.Invoke(_store);
             });
