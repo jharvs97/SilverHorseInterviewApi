@@ -1,4 +1,6 @@
+using SilverHorseInterviewApi.Aggregates;
 using SilverHorseInterviewApi.Models;
+using System.IO;
 using System.Net;
 using System.Net.Http.Headers;
 
@@ -6,40 +8,73 @@ namespace SilverHorseInterviewApi
 {
     public class Program
     {
-        static Uri BuildUri(string path)
+        static Uri BuildMockDataUri(string path)
         {
             return new UriBuilder("https", "jsonplaceholder.typicode.com", 443, path).Uri;
         }
 
-        static async Task<T[]> GetCollection<T>(string path)
+        static string GetModelApiName<T>()
+        {
+            string resourceName = typeof(T).Name.ToLower();
+            if (resourceName.EndsWith('y'))
+            {
+                resourceName = resourceName.Substring(0, resourceName.Length - 1) + "ies";
+            }
+            else
+            {
+                resourceName += "s";
+            }
+            return resourceName;
+        }
+        
+        static string ModelToApiPath<T>(string apiPrefix)
+        {
+            return apiPrefix + GetModelApiName<T>();
+        }
+
+        static async Task<IEnumerable<T>> GetCollection<T>(Uri uri)
+            where T : IModel
+        {
+            var json = await GetCollectionJson(uri);
+
+            // Return a deserialized collection or an empty collection
+            return JsonSerializer.Deserialize<IEnumerable<T>>(json) ?? new T[] { };
+        }
+
+        static async Task<string> GetCollectionJson(Uri uri)
         {
             using var client = new HttpClient();
 
             client.DefaultRequestHeaders.Accept.Clear();
             client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            var uri = BuildUri(path);
-            var json = await client.GetStringAsync(BuildUri(path));
-
-            // Return a deserialized collection or an empty collection
-            return JsonSerializer.Deserialize<T[]>(json) ?? new T[] { };
+            return await client.GetStringAsync(uri);
         }
 
-        static void BuildResourceCollectionEndpoint<T>(WebApplication app, string endpointPrefix = "api/")
+        static void AddResourceEndpoint<T>(WebApplication app, string endpointPrefix = "api/")
+            where T : IModel
         {
             Type type = typeof(T);
-            string resourceCollectionName = type.Name.ToLower() + "s";
-            string resourceCollectionPath = endpointPrefix + resourceCollectionName;
+            string resourceCollectionPath = ModelToApiPath<T>(endpointPrefix);
 
             app.MapGet(resourceCollectionPath, async (HttpContext context) =>
             {
-                return await GetCollection<T>(resourceCollectionName);
-            });
+                return await GetCollection<T>(BuildMockDataUri(GetModelApiName<T>()));
+            })
+            .Produces(200, typeof(T), "application/json");
         }
 
-        static void BuildAggregateCollectionEndpoint<T>()
+        static void AddAggregateEndpoint(WebApplication app, string endpointPrefix = "api/")
         {
-
+            app.MapGet(endpointPrefix + "collection", async (HttpContext context) =>
+            {
+                Collection collection = new Collection();
+                collection.Posts  = (await GetCollection<Post>(BuildMockDataUri(GetModelApiName<Post>()))).ToArray();
+                collection.Albums = (await GetCollection<Album>(BuildMockDataUri(GetModelApiName<Album>()))).ToArray();
+                collection.Users  = (await GetCollection<User>(BuildMockDataUri(GetModelApiName<User>()))).ToArray();
+                return collection;
+            })
+            .Produces(200, typeof(Collection), "application/json");
         }
 
         public static void Main(string[] args)
@@ -65,9 +100,11 @@ namespace SilverHorseInterviewApi
             app.UseHttpsRedirection();
             app.UseAuthorization();
 
-            BuildResourceCollectionEndpoint<Post>(app);
-            BuildResourceCollectionEndpoint<User>(app);
-            BuildResourceCollectionEndpoint<Album>(app);
+            AddResourceEndpoint<Post>(app);
+            AddResourceEndpoint<User>(app);
+            AddResourceEndpoint<Album>(app);
+
+            AddAggregateEndpoint(app);
 
             app.Run();
         }

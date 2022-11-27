@@ -1,7 +1,7 @@
 ﻿namespace SilverHorseInterviewApi.Models
 {
     [JsonSerializable(typeof(Post))]
-    internal partial class Post
+    internal partial class Post : IModel
     {
         [JsonPropertyName("id")]
         [JsonPropertyOrder(0)]
