@@ -96,6 +96,7 @@ namespace SilverHorseInterviewApi
         private static IEnumerable<T> ChooseNRandom<T>(IEnumerable<T> items, int n)
         {
             Random random = new Random();
+            // Construct a list from the enumerable so we can pluck elements out as we select them randomly
             List<T> inItemsList = new List<T>(items);
             List<T> outList = new List<T>();
             

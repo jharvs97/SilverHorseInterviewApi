@@ -4,6 +4,9 @@ using System.Net.Http.Headers;
 
 namespace SilverHorseInterviewApi.Store
 {
+    /// <summary>
+    /// A mock data store, wasn't sure if EF was allowed for the interview.
+    /// </summary>
     public class MockStore : IStore
     {
         private readonly Uri _mockDataUri = new UriBuilder("https", "jsonplaceholder.typicode.com").Uri;

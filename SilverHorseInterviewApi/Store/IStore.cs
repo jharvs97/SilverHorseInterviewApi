@@ -2,6 +2,9 @@
 
 namespace SilverHorseInterviewApi.Store
 {
+    /// <summary>
+    /// Interface to a backing store
+    /// </summary>
     internal interface IStore
     {
         Task<IEnumerable<T>> ReadCollection<T>() where T : IModel;
