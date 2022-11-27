@@ -1,5 +1,4 @@
 ﻿using SilverHorseInterviewApi.Models;
-using System.IO;
 using System.Net.Http.Headers;
 
 namespace SilverHorseInterviewApi.Store
@@ -11,19 +10,24 @@ namespace SilverHorseInterviewApi.Store
     public class MockStore : IStore
     {
         private readonly Uri _mockDataUri = new UriBuilder("https", "jsonplaceholder.typicode.com").Uri;
+        private HttpClient _httpClient;
 
         public MockStore()
         {
+            _httpClient = new HttpClient();
+            _httpClient.BaseAddress = _mockDataUri;
+            _httpClient.DefaultRequestHeaders.Accept.Clear();
+            _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         }
 
         async Task<IEnumerable<T>> IStore.ReadCollection<T>()
         {
-            return await GetCollection<T>(Helpers.GetModelApiName<T>());
+            return await GetMockCollection<T>();
         }
 
         async Task<T> IStore.Read<T>(int id)
         {
-            T? model = await Get<T>(Helpers.GetModelApiName<T>(), id);
+            T? model = await GetMockRecord<T>(id);
 
             if (model == null)
             {
@@ -43,41 +47,31 @@ namespace SilverHorseInterviewApi.Store
             return;
         }
 
-        private async Task<IEnumerable<T>> GetCollection<T>(string path)
+        private async Task<IEnumerable<T>> GetMockCollection<T>()
            where T : IModel
         {
-            var json = await GetJsonCollection(path);
+            var json = await GetJsonCollection(Helpers.GetModelApiName<T>());
 
             // Return a deserialized collection or an empty collection
             return JsonSerializer.Deserialize<IEnumerable<T>>(json) ?? new T[] { };
         }
 
-        private async Task<T?> Get<T>(string path, int id)
+        private async Task<T?> GetMockRecord<T>(int id)
            where T : IModel
         {
-            var json = await GetJson(path, id);
+            var json = await GetJsonRecord(Helpers.GetModelApiName<T>(), id);
 
             return JsonSerializer.Deserialize<T>(json);
         }
 
         private async Task<string> GetJsonCollection(string path)
         {
-            using var client = new HttpClient();
-
-            client.DefaultRequestHeaders.Accept.Clear();
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            return await client.GetStringAsync(new Uri(_mockDataUri, path));
+            return await _httpClient.GetStringAsync(path);
         }
 
-        private async Task<string> GetJson(string path, int id)
+        private async Task<string> GetJsonRecord(string path, int id)
         {
-            using var client = new HttpClient();
-
-            client.DefaultRequestHeaders.Accept.Clear();
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            return await client.GetStringAsync(new Uri(_mockDataUri, path + "/" + id));
+            return await _httpClient.GetStringAsync(path + "/" + id);
         }
     }
 }
