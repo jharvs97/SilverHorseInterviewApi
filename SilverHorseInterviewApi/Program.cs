@@ -6,80 +6,12 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using Microsoft.OpenApi.Models;
+using SilverHorseInterviewApi.Store;
 
 namespace SilverHorseInterviewApi
 {
     public class Program
     {
-        static Uri BuildMockDataUri(string path)
-        {
-            return new UriBuilder("https", "jsonplaceholder.typicode.com", 443, path).Uri;
-        }
-
-        static string GetModelApiName<T>()
-        {
-            string resourceName = typeof(T).Name.ToLower();
-            if (resourceName.EndsWith('y'))
-            {
-                resourceName = resourceName.Substring(0, resourceName.Length - 1) + "ies";
-            }
-            else
-            {
-                resourceName += "s";
-            }
-            return resourceName;
-        }
-        
-        static string ModelToApiPath<T>(string apiPrefix)
-        {
-            return apiPrefix + GetModelApiName<T>();
-        }
-
-        static async Task<IEnumerable<T>> GetCollection<T>(Uri uri)
-            where T : IModel
-        {
-            var json = await GetCollectionJson(uri);
-
-            // Return a deserialized collection or an empty collection
-            return JsonSerializer.Deserialize<IEnumerable<T>>(json) ?? new T[] { };
-        }
-
-        static async Task<string> GetCollectionJson(Uri uri)
-        {
-            using var client = new HttpClient();
-
-            client.DefaultRequestHeaders.Accept.Clear();
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            return await client.GetStringAsync(uri);
-        }
-
-        static void AddResourceEndpoint<T>(WebApplication app, string endpointPrefix = "api/")
-            where T : IModel
-        {
-            Type type = typeof(T);
-            string resourceCollectionPath = ModelToApiPath<T>(endpointPrefix);
-
-            app.MapGet(resourceCollectionPath, async (HttpContext context) =>
-            {
-                return await GetCollection<T>(BuildMockDataUri(GetModelApiName<T>()));
-            })
-            .Produces(200, typeof(T), "application/json");
-        }
-
-        static void AddAggregateEndpoint(WebApplication app, string endpointPrefix = "api/")
-        {
-            app.MapGet("/collection", async (HttpContext context) =>
-            {
-                Collection collection = new Collection();
-                collection.Posts  = (await GetCollection<Post>(BuildMockDataUri(GetModelApiName<Post>()))).ToArray();
-                collection.Albums = (await GetCollection<Album>(BuildMockDataUri(GetModelApiName<Album>()))).ToArray();
-                collection.Users  = (await GetCollection<User>(BuildMockDataUri(GetModelApiName<User>()))).ToArray();
-                return collection;
-            })
-            .Produces(200, typeof(Collection), "application/json");
-        }
-
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
@@ -142,13 +74,38 @@ namespace SilverHorseInterviewApi
                 await next(context);
             });
 
-            AddResourceEndpoint<Post>(app);
-            AddResourceEndpoint<User>(app);
-            AddResourceEndpoint<Album>(app);
+            var endpointBuilder = new ResourceEndpointBuilder(app, new MockStore());
+            endpointBuilder.Add<Post>();
+            endpointBuilder.Add<User>();
+            endpointBuilder.Add<Album>();
 
-            AddAggregateEndpoint(app);
+            endpointBuilder.CreateAggregate<Collection>(async (IStore store) =>
+            {
+                var collection = new Collection();
+                collection.Posts  = ChooseNRandom(await store.ReadCollection<Post>(), 30).ToArray();
+                collection.Albums = ChooseNRandom(await store.ReadCollection<Album>(), 30).ToArray();
+                collection.Users  = ChooseNRandom(await store.ReadCollection<User>(), 30).ToArray();
+
+                return collection;
+            });
 
             app.Run();
+        }
+
+        private static IEnumerable<T> ChooseNRandom<T>(IEnumerable<T> items, int n)
+        {
+            Random random = new Random();
+            List<T> inItemsList = new List<T>(items);
+            List<T> outList = new List<T>();
+            
+            for (int i = 0; i < n; i++)
+            {
+                int index = random.Next(inItemsList.Count());
+                outList.Add(inItemsList.ElementAt(index));
+                inItemsList.RemoveAt(index);
+            }
+
+            return outList;
         }
     }
 }
