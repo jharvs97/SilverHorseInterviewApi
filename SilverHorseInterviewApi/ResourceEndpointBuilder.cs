@@ -25,6 +25,11 @@ namespace SilverHorseInterviewApi
             _store = store;
         }
 
+        /// <summary>
+        /// Add GRUD operations for a model
+        /// </summary>
+        /// <typeparam name="T">The Model</typeparam>
+        /// <param name="endpointPath">Optional: Defaults the endpoint to the name of the Model</param>
         public void Add<T>(string? endpointPath = null) where T : IModel
         {
             string resourceCollectionPath;
@@ -51,24 +56,29 @@ namespace SilverHorseInterviewApi
             })
             .Produces(200, typeof(T), "application/json");
 
-            // Create/Update are no-op as I dont have a _real_ db store.
-            _app.MapPost(resourceCollectionPath + "/{id}", async (int id, T data, HttpContext context) =>
+            _app.MapPost(resourceCollectionPath, async (T data, HttpContext context) =>
             {
                 await _store.Write(data);
             });
 
             _app.MapPut(resourceCollectionPath + "/{id}", async (int id, T data, HttpContext context) =>
             {
-                await _store.Write(data);
+                await _store.Write(id, data);
             });
 
         }
 
-        public void CreateAggregate<T>(string endpointPath, AggregateBuilderDelegate del) where T : IAggregate
+        /// <summary>
+        /// Create an endpoint that returns an aggregate
+        /// </summary>
+        /// <typeparam name="T">The Aggregate type</typeparam>
+        /// <param name="endpointPath">The endpoint for the api</param>
+        /// <param name="aggregateBuilder">A delegate method that returns a T aggregate</param>
+        public void CreateAggregate<T>(string endpointPath, AggregateBuilderDelegate aggregateBuilder) where T : IAggregate
         {
             _app.MapGet(endpointPath, async (HttpContext context) =>
             {
-                return (T) await del.Invoke(_store);
+                return (T) await aggregateBuilder.Invoke(_store);
             });
         }
     }

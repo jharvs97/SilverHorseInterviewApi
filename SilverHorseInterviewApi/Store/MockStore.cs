@@ -6,6 +6,7 @@ namespace SilverHorseInterviewApi.Store
 {
     /// <summary>
     /// A mock data store, wasn't sure if EF was allowed for the interview.
+    /// The mock store no-ops all writes
     /// </summary>
     public class MockStore : IStore
     {
@@ -22,7 +23,14 @@ namespace SilverHorseInterviewApi.Store
 
         async Task<T> IStore.Read<T>(int id)
         {
-            return await Get<T>(Helpers.GetModelApiName<T>(), id);
+            T? model = await Get<T>(Helpers.GetModelApiName<T>(), id);
+
+            if (model == null)
+            {
+                throw new NotFoundInStoreException<T>(id);
+            }
+
+            return model;
         }
 
         async Task IStore.Write<T>(T model)
@@ -44,7 +52,7 @@ namespace SilverHorseInterviewApi.Store
             return JsonSerializer.Deserialize<IEnumerable<T>>(json) ?? new T[] { };
         }
 
-        private async Task<T> Get<T>(string path, int id)
+        private async Task<T?> Get<T>(string path, int id)
            where T : IModel
         {
             var json = await GetJson(path, id);

@@ -3,6 +3,7 @@ using SilverHorseInterviewApi.Models;
 using SilverHorseInterviewApi.Store;
 using Microsoft.OpenApi.Models;
 using System.Buffers;
+using SilverHorseInterviewApi.Extensions;
 
 namespace SilverHorseInterviewApi
 {
@@ -83,31 +84,14 @@ namespace SilverHorseInterviewApi
             endpointBuilder.CreateAggregate<Collection>("/collection", async (IStore store) =>
             {
                 var collection = new Collection();
-                collection.Posts  = ChooseNRandom(await store.ReadCollection<Post>(), 30).ToArray();
-                collection.Albums = ChooseNRandom(await store.ReadCollection<Album>(), 30).ToArray();
-                collection.Users  = ChooseNRandom(await store.ReadCollection<User>(), 30).ToArray();
+                collection.Posts  = (await store.ReadCollection<Post>()).Sample(30).ToArray();
+                collection.Albums = (await store.ReadCollection<Album>()).Sample(30).ToArray();
+                collection.Users  = (await store.ReadCollection<User>()).Sample(30).ToArray();
 
                 return collection;
             });
 
             app.Run();
-        }
-
-        private static IEnumerable<T> ChooseNRandom<T>(IEnumerable<T> items, int n)
-        {
-            Random random = new Random();
-            // Construct a list from the enumerable so we can pluck elements out as we select them randomly
-            List<T> inItemsList = new List<T>(items);
-            List<T> outList = new List<T>();
-            
-            for (int i = 0; i < n; i++)
-            {
-                int index = random.Next(inItemsList.Count());
-                outList.Add(inItemsList.ElementAt(index));
-                inItemsList.RemoveAt(index);
-            }
-
-            return outList;
         }
     }
 }
